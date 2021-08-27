@@ -225,7 +225,55 @@ def improve(problem, initialNode,heuristic):
                 queue.push(nextNode)
     return outNode
 
-prunedNeighbors = []
+
+def jumpPointSearch1(problem, heuristic=nullHeuristic):
+    priorityQueue = util.PriorityQueue()
+    startState = problem.getStartState()
+    startNode = startState, '', 0, [] 
+
+    
+    operations = []
+    fStart = heuristic(startState, problem)
+    priorityQueue.push(startNode,fStart)
+    bestG = fStart
+    isGoal = False
+    closed = []
+    while not priorityQueue.isEmpty():
+        currentNode = priorityQueue.pop()
+        # currentNode is composed of (currentState/coord, currentAction, currentCost, currentPath)
+        currentState, currentAction, currentCost, currentPath = currentNode
+        if currentState not in closed:
+            closed.append(currentState)
+        if problem.isGoalState(currentState):
+            isGoal = True
+            break
+        succ = identifySuccessors((currentState, currentAction, currentCost), problem, closed)
+
+        #print(closed)
+        print(succ)
+        for successor in succ:
+            if successor is not None:
+
+                succState, succAction, succCost = successor
+
+                tempCost = util.manhattanDistance(succState, currentState) + succCost
+                #costSucc = util.manhattanDistance(stateSucc, outState) + costSucc
+
+                fNext = tempCost + heuristic(succState, problem)
+                nextNode = (succState, succAction, succCost, currentPath + [(currentState, currentAction)])
+                #nextNode = (stateSucc, actionSucc, costSucc, outPath + [(outState, outAction)])
+                priorityQueue.push(nextNode, fNext)
+                #openset.append(stateSucc)
+
+    if isGoal == True:
+        for operation in currentPath:
+            operations.append(operation[1])
+        del operations[0]
+    else:
+        operations = []
+  
+    return operations
+
 def jumpPointSearch(problem, heuristic=nullHeuristic):
     """
     Search by pruning non-critical neighbors with jump points.
@@ -236,201 +284,161 @@ def jumpPointSearch(problem, heuristic=nullHeuristic):
     "*** YOUR CODE HERE FOR TASK 3 ***"
     priorityQueue = util.PriorityQueue()
     startState = problem.getStartState()
-    startNode = startState, '', 0, [] 
+    startNode = startState, '', 0, []
+
     closed = []
     operations = []
-    
-    hStart = heuristic(startState, problem)
-    priorityQueue.push(startNode,hStart)
+    fStart = heuristic(startState, problem)
+    priorityQueue.push(startNode, fStart)
     isGoal = False
+
     while not priorityQueue.isEmpty():
         outNode = priorityQueue.pop()
         outState, outAction, outCost, outPath = outNode
-        
-        if (outState not in closed): 
+        if outState not in closed:
             closed.append(outState)
-            
-            
+
             if problem.isGoalState(outState):
-                outPath = outPath + [(outState,outAction)]
+                #outPath = outPath + [(outState, outAction)]
                 isGoal = True
+                print(outPath)
                 break
-            current = outState, outAction, outCost
-            succ = identifySuccessors(current,problem)
-           
+            succ = identifySuccessors(outNode, problem, closed)
+            print(succ)
             for successor in succ:
-                stateSucc, actionSucc, costSucc = successor
-             
-                nextNode = (stateSucc, actionSucc, costSucc + outCost, outPath + [(outState,outAction)])
-                h = costSucc + outCost+heuristic(stateSucc, problem)
-                if h < float('inf') :
-                    priorityQueue.push(nextNode,h)
+            #if successor != None:
+                stateSucc, actionSucc, costSucc, _ = successor
+
+                costSucc = util.manhattanDistance(stateSucc, outState) + costSucc
+                fNext = costSucc + heuristic(stateSucc, problem)
+
+                #nextNode = (stateSucc, actionSucc, costSucc, outPath + [(outState, outAction)])
+                priorityQueue.push(successor, fNext)
+
+
     if isGoal == True:
         for operation in outPath:
             operations.append(operation[1])
-        del operations[0]
+
     else:
         operations = []
+
+
     return operations
 
-def identifySuccessors(currentNode,problem):
+def identifySuccessors(currentNode,problem,closed):
     successor = []
-    currentState, a, cost = currentNode
+
+    currentState, _, _, _ = currentNode
     neighbors = problem.getSuccessors(currentState)
-  
+
     for n in neighbors:
-        newSuccessors = []
-        statePos = n[0]
-        
-        dir = direction(currentState,statePos)
-        if dir[2] == True:
-            newSuccessors = verticalJump(currentNode,dir,problem)
-        else:
-            newSuccessor = horizontalJump(currentNode,dir,problem)
-            if newSuccessor != None:
-                newSuccessors = newSuccessor
-        if newSuccessors != None:
-            for s in newSuccessors:
-                print(s)
-                sPos,sAction,sCost = s
-                parentDir = direction(sPos,currentState)
-                successor.append(s)
+        stateN = n[0]
+        if stateN not in closed:
 
+            dir = direction(currentState, n[0])
+            retN = jump(currentNode, dir, problem)
+            successor.append(retN)
 
+    successor = [x for x in successor if x is not None]
+    print(successor)
     return successor
-
-def jump(startNode,d,startState,goalState,problem):
-    nodeX,nodeY = int(startNode[0] + d[0]), int(startNode[1] + d[1])
-    node = (nodeX,nodeY)
-     
-    wallGrid= problem.obtainWall()
-    widthWall = wallGrid.width
-    heightWall = wallGrid.height
-    if problem.walls[nodeX][nodeY] or (nodeX >widthWall) or (nodeY> heightWall):
-        return None
+   
     
-    if node == goalState:
-        return node
-    
- 
-def verticalJump(startNode,direction,problem):
-    
-    successor = []
-    startPos, dStart, startCost = startNode
-    d, action,isVertical = direction
-    nodeX,nodeY = int(startPos[0] + d[0]), int(startPos[1] + d[1])
-    node = (nodeX,nodeY)
-    n = node, action, startCost + 1
-    
-    wallGrid= problem.walls
-    widthWall = wallGrid.width
-    heightWall = wallGrid.height
-    if problem.walls[nodeX][nodeY] or (nodeX >widthWall) or (nodeY> heightWall):
-        return None
-    
-    if problem.isGoalState(node):
-        successor.append(n)
-        return successor
-    # go right
-    eastX = int(startPos[0] + 1)
-    succ = (eastX, startPos[1]), Directions.EAST, startCost+1 
-    if not problem.walls[eastX][startPos[1]]:
-        di = (1,0),Directions.EAST, False
-        eastJump = horizontalJump(succ, di, problem)
         
-        if eastJump != None:
-            n1 = addNeighbor(startNode,direction,problem)
-            n2 = addNeighbor(startNode,Directions.WEST,problem)
-            prunedNeighbors.append(n1)
-            prunedNeighbors.append(n2)
-            successor.append(startNode)
-            successor.append(eastJump)
-            return successor
-
-    # go left
-    westX = int(startPos[0] - 1)
-    succ = (westX, startPos[1]), Directions.WEST, startCost+1 
-    if not problem.walls[westX][startPos[1]]:
-        di = (-1,0),Directions.WEST, False
-        westJump = horizontalJump(succ, di, problem)
-        if westJump != None:
-            n1 = addNeighbor(startNode,direction,problem)
-            prunedNeighbors.append(n1)
-            successor.append(startNode)
-            successor.append(westJump)
-            return successor
-
-    startNode == n
-    return verticalJump(startNode,direction,problem)
-
-def horizontalJump(startNode,direction,problem):
-    d, action,isVertical = direction
+def jump(startNode,dir,problem):
+    
+    parentPos = startNode[0] #(7,5)
+    vector, action, isVertical = dir
     n = move(startNode,action)
-    nodeX,nodeY = n[0]
+    # n is : (coord, Action, Coat)
+    statePos, startAction, cost, _ = n
+
+    (nodeX, nodeY) = statePos
+     
     wallGrid= problem.walls
-    widthWall = wallGrid.width
-    heightWall = wallGrid.height
-    if problem.walls[nodeX][nodeY] or (nodeX >widthWall) or (nodeY> heightWall):
+    print(wallGrid, '\n')
+    widthWall = wallGrid.width - 2 # 7
+    heightWall = wallGrid.height-2 # 5
+    
+    if problem.walls[nodeX][nodeY] or (nodeX >widthWall) or (nodeY> heightWall) or nodeX<1 or nodeY<1:
         return None
     
-    if problem.isGoalState(n[0]):
-        return startNode
-    if hasVerticalNeighbors(startNode,direction,problem):
-        return startNode 
+    if problem.isGoalState(statePos):
+        return n
+    
+    neighbours = problem.getSuccessors(statePos)
+   
+    # if node is forced
+    parentX = parentPos[0]
+    parentY = parentPos[1]
 
-    startNode = n
-    return horizontalJump(startNode,direction,problem)
+    print(action, Directions)
+    for neighbour in neighbours:
+        neighbourPos = neighbour[0]
 
-def hasVerticalNeighbors(startNode,direction,problem):
-    startPos = startNode[0]
+        if neighbour[0] != parentPos and (not problem.walls[neighbourPos[0]][neighbourPos[1]]):
+
+
+            if action == Directions.EAST:
+                upWall = problem.walls[parentX][parentY+1]
+                downWall = problem.walls[parentX][parentY-1]
+                if (upWall and not problem.walls[parentX+1][parentY+1]) or (downWall and not problem.walls[parentX+1][parentY-1]):
+                    return n
+
+            if action == Directions.WEST:
+                upWall = problem.walls[parentX][parentY+1]
+                downWall = problem.walls[parentX][parentY-1]
+
+                if (upWall and not problem.walls[parentX-1][parentY-1]) or (downWall and not problem.walls[parentX+1][parentY-1]):
+                    return n
+
+            if action == Directions.SOUTH:
+                rightWall = problem.walls[parentX+1][parentY]
+                leftWall = problem.walls[parentX-1][parentY]
+                if (rightWall and not problem.walls[parentX-1][parentY+1]) or (leftWall and not problem.walls[parentX+1][parentY-1]):
+                    return n
+
+            if action == Directions.NORTH:
+                rightWall = problem.walls[parentX+1][parentY]
+                leftWall = problem.walls[parentX-1][parentY]
+                if (rightWall and not problem.walls[parentX-1][parentY+1])  or (leftWall and not problem.walls[parentX-1][parentY-1]):
+                    return n
+
+    return jump(n,dir,problem)
+
+
+def valid_position(width, height, x, y):
+    return 0 < x <= width and 0 < y <= height
+
+
+
+def reverseDirection(direction):
     d, action,isVertical = direction
-    nodeX,nodeY = int(startPos[0] - d[0]), int(startPos[1] - d[1])
-    preNode = (nodeX,nodeY),action,startNode[2]+1
-    near = []
-    # go up
-    if not problem.walls[nodeX][nodeY]:
-        up = move(preNode,Directions.NORTH)
-        down = move(preNode,Directions.SOUTH)
-        near.append(up)
-        near.append(down)
-        has = False
-        for nodes in near:
-            nodePos = nodes[0]
-            neighbour = move(nodes,action)
-            neighbourPos, a, cost = neighbour
-            if problem.walls[nodePos[0]][nodePos[1]] and (not problem.walls[neighbourPos[0]][neighbourPos[1]]):
-                prunedNeighbors.append(neighbour)
-                has = True
-        if has:
-            nextNeigh = move(startNode,action)
-            nextNeighPos = nextNeigh[0]
-            if not problem.walls[nextNeighPos[0]][nextNeighPos[1]]:
-                prunedNeighbors.append(nextNeigh)
-        return has
-
-    return False
-
+    dNew = (-d[0],-d[1])
+    if action == Directions.NORTH:
+        action = Directions.SOUTH
+    elif action == Directions.SOUTH:
+        action = Directions.NORTH
+    elif action == Directions.WEST:
+        action = Directions.EAST
+    elif action == Directions.EAST:
+        action = Directions.WEST
+    newDirection = dNew,action,isVertical
+    return newDirection
+        
 
 
 def move(node,action):
-    startPos, dStart, startCost = node
+    startPos, dStart, startCost, lastPath = node
     dx, dy = Actions.directionToVector(action)
     
     nodeX,nodeY = int(startPos[0] + dx), int(startPos[1] + dy)
     node2 = (nodeX,nodeY)
-    n = node2, action, startCost + 1
+
+    n = node2, action, startCost + 1, lastPath+[(startPos, action)]
     return n
-
-
-def addNeighbor(node,dir,problem):
-    startPos, di, startCost = node
-    d, action,isVertical = dir
-    nodeX,nodeY = int(startPos[0] + d[0]), int(startPos[1] + d[1])
-    n = (nodeX,nodeY)
-    neighbour = n, action, startCost+1
-    if not problem.walls[nodeX][nodeY]:
-        return neighbour
-
+   
 
 '''
 Return vector from pointB to pointA, eg.(-1.0 0.0)
@@ -440,12 +448,13 @@ def direction(nodeA,nodeB):
     y = nodeB[1] - nodeA[1]
     angle = degrees(atan2(y,x))
     isVertical = True
+    
     action = Directions.NORTH
     direct = Actions.directionToVector(action)
     if angle == 90.0:
         action = Directions.NORTH
         direct = Actions.directionToVector(action)
-    elif angle == 180.0:
+    elif angle == -90.0:
         action = Directions.SOUTH
         direct = Actions.directionToVector(action)
     elif angle == 180.0:
